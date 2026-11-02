@@ -1,0 +1,157 @@
+/* Normaliza la caja y la tipografía que se usan en la pantalla de acceso. */
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:Arial, sans-serif;
+}
+
+/* Centra el formulario de acceso sobre el fondo de la página. */
+body{
+    background:#080b10;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    min-height:100vh;
+    padding:24px;
+}
+
+body.modo-claro{
+    background:#f2f5f9;
+}
+
+/* Define el tamaño, colores y jerarquía visual del formulario. */
+.login{
+    width:100%;
+    max-width:371px;
+    min-height:507px;
+    background:#10151d;
+    padding:40px 27px 38px;
+    border:1px solid #283342;
+    border-top:2px solid #d5a83b;
+    text-align:left;
+    color:#f5f7fa;
+}
+
+/* Presenta el logotipo centrado y con dimensiones controladas. */
+.login-logo{
+    display:block;
+    width:150px;
+    height:150px;
+    object-fit:contain;
+    margin:0 auto 22px;
+}
+
+.login h1{
+    margin-bottom:24px;
+    color:#f5f7fa;
+    font-size:22px;
+}
+
+/* Da estilo a los campos, etiquetas y botón del formulario. */
+.login label{
+    display:block;
+    margin-bottom:8px;
+    color:#aabbd0;
+    font-size:9px;
+}
+
+.login input{
+    width:100%;
+    height:35px;
+    padding:9px;
+    margin:0 0 16px;
+    border:1px solid #283342;
+    border-radius:0;
+    font-size:10px;
+    background:#0b1017;
+    color:#f5f7fa;
+}
+
+.login input::placeholder{
+    color:#71849b;
+}
+
+.login button{
+    width:100%;
+    height:32px;
+    padding:8px;
+    margin-top:0;
+    background:#4b91df;
+    color:#08111c;
+    border:none;
+    border-radius:0;
+    cursor:pointer;
+    font-size:10px;
+}
+
+.login button:hover{
+    background:#70a9e8;
+}
+
+.login-link{
+    margin-top:13px;
+    color:#aabbd0;
+    font-size:9px;
+}
+
+.login-link a{
+    color:#d5a83b;
+}
+
+/* Ajusta la apariencia cuando la aplicación está en modo claro. */
+body.modo-claro .login{
+    background:#ffffff;
+    border-color:#8b9bad;
+    border-top-color:#8a5a00;
+    color:#17212f;
+}
+
+body.modo-claro .login h1{
+    color:#17212f;
+}
+
+body.modo-claro .login-logo{
+    filter:brightness(0);
+}
+
+body.modo-claro .login label{
+    color:#26384d;
+    font-size:12px;
+    font-weight:600;
+}
+
+body.modo-claro .login input{
+    background:#ffffff;
+    border-color:#52657a;
+    color:#17212f;
+    font-size:16px;
+}
+
+body.modo-claro .login input::placeholder{
+    color:#46566b;
+}
+
+body.modo-claro .login button{
+    background:#1d4e89;
+    color:#ffffff;
+    font-size:16px;
+    font-weight:600;
+}
+
+body.modo-claro .login button:hover{
+    background:#163b68;
+}
+
+/* Conserva márgenes adecuados en dispositivos estrechos o bajos. */
+@media (max-width:420px){
+    .login{
+        padding:32px 22px;
+    }
+}
+
+@media (max-height:600px){
+    body{
+        align-items:flex-start;
+    }
+}
