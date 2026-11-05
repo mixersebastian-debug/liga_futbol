@@ -39,7 +39,7 @@ if (!$existeClubCategoria) {
 
 $consultaJugadores = mysqli_prepare(
     $conexion,
-    "SELECT jugadores.cedula, jugadores.nombre, jugadores.apellido,
+    "SELECT jugadores.cedula, jugadores.nombre, jugadores.apellido, jugadores.masa,
             jugadores.foto, carnets_aptitud.archivo AS archivo_aptitud,
             carnets_aptitud.fecha_vencimiento
      FROM jugadores

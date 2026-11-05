@@ -3,13 +3,14 @@
 // Registra un club y su usuario en una única transacción de base de datos.
 require_once __DIR__ . '/../modelos/conexion.php';
 require_once __DIR__ . "/../modelos/club_logos.php";
+require_once __DIR__ . '/../modelos/contrasenas.php';
 require_admin();
 
 // Recoge los valores del formulario y centraliza los mensajes de respuesta.
 $nombre = trim($_POST['nombre'] ?? '');
 $ciudad = trim($_POST['ciudad'] ?? '');
 $usuario = trim($_POST['usuario'] ?? '');
-$contrasena = trim($_POST['contraseña'] ?? '');
+$contrasena = $_POST['contraseña'] ?? '';
 $rutaLogo = null;
 
 function mostrarMensaje($mensaje) {
@@ -30,9 +31,17 @@ if (
     $nombre === '' ||
     $ciudad === '' ||
     $usuario === '' ||
+    !is_string($contrasena) ||
     $contrasena === ''
 ) {
     mostrarMensaje('Completa todos los campos.');
+}
+
+try {
+    $hashContrasena = crearHashContrasena($contrasena);
+} catch (RuntimeException $error) {
+    error_log('No se pudo proteger la contraseña del club: ' . $error->getMessage());
+    mostrarMensaje('No se pudo registrar el club. Inténtalo nuevamente.');
 }
 
 try {
@@ -66,7 +75,7 @@ try {
         $stmt_usuario,
         "ss",
         $usuario,
-        $contrasena
+        $hashContrasena
     );
 
     if (!mysqli_stmt_execute($stmt_usuario)) {

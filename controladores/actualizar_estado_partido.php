@@ -60,14 +60,15 @@ $fechaPartido = $fecha === "" ? null : $fecha;
 $actualizar = mysqli_prepare(
     $conexion,
     "UPDATE partidos
-     SET estado = ?, fecha = ?, resultado = CASE WHEN ? = 'jugado' THEN resultado ELSE NULL END
+     SET estado = ?, fecha = ?, resultado = CASE WHEN ? = 'jugado' THEN resultado ELSE NULL END,
+         velocidad_maxima_balon_kmh = CASE WHEN ? = 'jugado' THEN velocidad_maxima_balon_kmh ELSE NULL END
      WHERE id = ?"
 );
 if (!$actualizar) {
     http_response_code(500);
     exit("No se pudo preparar la actualización del partido.");
 }
-mysqli_stmt_bind_param($actualizar, "sssi", $estado, $fechaPartido, $estado, $partidoId);
+mysqli_stmt_bind_param($actualizar, "ssssi", $estado, $fechaPartido, $estado, $estado, $partidoId);
 if (!mysqli_stmt_execute($actualizar)) {
     error_log("Error al actualizar el estado del partido: " . mysqli_stmt_error($actualizar));
     mysqli_stmt_close($actualizar);

@@ -3,6 +3,7 @@
 // Comprueba el partido seleccionado y guarda el marcador recibido.
 require_once __DIR__ . '/../modelos/conexion.php';
 require_once __DIR__ . "/../modelos/validacion_fecha_partido.php";
+require_once __DIR__ . "/../modelos/calculos_deportivos.php";
 require_admin();
 
 // Muestra un aviso y finaliza el flujo de escritura.
@@ -28,6 +29,7 @@ $partido_id = filter_var(
 
 $resultado = trim($_POST['resultado'] ?? '');
 $fechaIngresada = trim($_POST['fecha'] ?? '');
+$velocidadMaximaSimulada = null;
 
 if (
     $partido_id === false ||
@@ -39,6 +41,7 @@ if (
         'Debes seleccionar un partido e introducir su resultado.'
     );
 }
+$velocidadMaximaSimulada = generarVelocidadMaximaGolSimulada($resultado);
 
 if ($fechaIngresada !== "") {
     if (!fechaPartidoPermitida($fechaIngresada)) {
@@ -88,7 +91,7 @@ if (!fechaPartidoPermitida($fechaPartido)) {
 // Actualizar el resultado
 $sql_actualizar = "
     UPDATE partidos
-    SET fecha = ?, resultado = ?, estado = 'jugado'
+    SET fecha = ?, resultado = ?, velocidad_maxima_balon_kmh = ?, estado = 'jugado'
     WHERE id = ?
 ";
 
@@ -101,9 +104,10 @@ if (!$stmt_actualizar) {
 
 mysqli_stmt_bind_param(
     $stmt_actualizar,
-    "ssi",
+    "sssi",
     $fechaPartido,
     $resultado,
+    $velocidadMaximaSimulada,
     $partido_id
 );
 

@@ -7,7 +7,15 @@ header("Content-Type: application/json; charset=utf-8");
 $sql = "
     SELECT jugadores.cedula, jugadores.nombre, jugadores.apellido,
            jugadores.fecha_nacimiento, jugadores.club_id, clubes.nombre AS nombre_club,
-           jugadores.categoria_id, categorias.nombre AS nombre_categoria
+           jugadores.categoria_id, categorias.nombre AS nombre_categoria,
+           jugadores.foto,
+           (
+               SELECT carnets_aptitud.archivo
+               FROM carnets_aptitud
+               WHERE carnets_aptitud.cedula_jugador = jugadores.cedula
+               ORDER BY carnets_aptitud.id DESC
+               LIMIT 1
+           ) AS archivo_aptitud
     FROM jugadores
     INNER JOIN clubes ON clubes.id = jugadores.club_id
     INNER JOIN categorias ON categorias.id = jugadores.categoria_id
@@ -30,7 +38,9 @@ while ($fila = mysqli_fetch_assoc($resultado)) {
         "club_id" => (int) $fila["club_id"],
         "club" => $fila["nombre_club"],
         "categoria_id" => (int) $fila["categoria_id"],
-        "categoria" => $fila["nombre_categoria"]
+        "categoria" => $fila["nombre_categoria"],
+        "foto" => $fila["foto"],
+        "archivo_aptitud" => $fila["archivo_aptitud"]
     ];
 }
 

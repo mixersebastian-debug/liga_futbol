@@ -911,16 +911,37 @@ document.getElementById("contenido").innerHTML=construirSeccion("Jugadores", "Ge
 
 }
 
-
 // Lista las categorías disponibles y muestra sus estadísticas.
 function mostrarCategorias(){
     document.getElementById("contenido").innerHTML =
         construirSeccion(
             "Categorías",
             "Jugadores por categoría",
-            '<p id="accionesCategorias">Cargando categorías...</p>',
+            `<h3>Administrar categorías</h3>
+            <form id="formularioCrearCategoria">
+                <label for="nombreCategoriaNueva">Nueva categoría:</label>
+                <input type="text" id="nombreCategoriaNueva" name="nombre" maxlength="50" required>
+                <button type="submit">Agregar categoría</button>
+                <p id="estadoGestionCategorias" role="status"></p>
+            </form>
+            <ul id="listaGestionCategorias"><li>Cargando categorías...</li></ul>
+            <hr>
+            <h3>Consultar jugadores por categoría</h3>
+            <p id="accionesCategorias">Cargando categorías...</p>`,
             "resumenCategorias"
         );
+
+    cargarGestionCategorias();
+    document.getElementById("formularioCrearCategoria").addEventListener("submit", evento => {
+        evento.preventDefault();
+        const formulario = evento.currentTarget;
+        const estado = document.getElementById("estadoGestionCategorias");
+        enviarGestionCategoria(new URLSearchParams(new FormData(formulario)), estado)
+        .then(() => formulario.reset())
+        .catch(error => {
+            estado.textContent = error.message;
+        });
+    });
 
     fetch("consultar_categorias_partido.php")
     .then(response => {
@@ -1008,6 +1029,77 @@ function mostrarCategorias(){
         if(contenedor) contenedor.textContent = "No se pudo cargar el resumen de categorías.";
     });
 
+}
+
+function cargarGestionCategorias(){
+    fetch("gestionar_categorias.php")
+    .then(async response => {
+        const datos = await response.json();
+        if(!response.ok) throw new Error(datos.error || "No se pudieron consultar las categorías.");
+        return datos.categorias;
+    })
+    .then(categorias => {
+        const lista = document.getElementById("listaGestionCategorias");
+        if(!lista) return;
+        lista.replaceChildren();
+        categorias.forEach(categoria => {
+            const fila = document.createElement("li");
+            fila.append(document.createTextNode(categoria.nombre));
+            if(!categoria.oficial){
+                const renombrar = document.createElement("button");
+                renombrar.type = "button";
+                renombrar.textContent = "Renombrar";
+                renombrar.addEventListener("click", () => {
+                    const nombre = window.prompt("Nuevo nombre de la categoría:", categoria.nombre);
+                    if(nombre === null || nombre.trim() === "") return;
+                    const datos = new URLSearchParams({
+                        accion: "renombrar",
+                        id: String(categoria.id),
+                        nombre: nombre.trim()
+                    });
+                    enviarGestionCategoria(datos, document.getElementById("estadoGestionCategorias"))
+                    .catch(error => {
+                        const estado = document.getElementById("estadoGestionCategorias");
+                        if(estado) estado.textContent = error.message;
+                    });
+                });
+                const eliminar = document.createElement("button");
+                eliminar.type = "button";
+                eliminar.textContent = "Eliminar";
+                eliminar.addEventListener("click", () => {
+                    if(!window.confirm(`¿Eliminar la categoría "${categoria.nombre}"?`)) return;
+                    const datos = new URLSearchParams({accion: "eliminar", id: String(categoria.id)});
+                    enviarGestionCategoria(datos, document.getElementById("estadoGestionCategorias"))
+                    .catch(error => {
+                        const estado = document.getElementById("estadoGestionCategorias");
+                        if(estado) estado.textContent = error.message;
+                    });
+                });
+                fila.append(" ", renombrar, " ", eliminar);
+            }
+            lista.appendChild(fila);
+        });
+    })
+    .catch(error => {
+        const lista = document.getElementById("listaGestionCategorias");
+        if(lista) lista.textContent = error.message;
+    });
+}
+
+function enviarGestionCategoria(datos, estado){
+    datos.set("accion", datos.get("accion") || "crear");
+    return fetch("gestionar_categorias.php", {
+        method: "POST",
+        headers: {"Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"},
+        body: datos.toString()
+    })
+    .then(async response => {
+        const respuesta = await response.json();
+        if(!response.ok) throw new Error(respuesta.error || "No se pudo guardar la categoría.");
+        if(estado) estado.textContent = respuesta.mensaje;
+        mostrarCategorias();
+        return respuesta;
+    });
 }
 
 // Abre la lista de jugadores pertenecientes a la categoría seleccionada.
@@ -1741,7 +1833,7 @@ function agregarJugador(){
 
     <form action="guardar_jugador.php" method="POST" enctype="multipart/form-data" onsubmit="return validarJugador()">
 
-        <input type="text" id="cedulaJugador" name="cedula" placeholder="Cédula (8 números)" inputmode="numeric" minlength="8" maxlength="8" pattern="[0-9]{8}" oninput="this.value=this.value.replace(/[^0-9]/g, '')" required>
+        <input type="text" id="cedulaJugador" name="cedula" placeholder="Cédula (8 números)" inputmode="numeric" minlength="8" maxlength="8" pattern="[0-9]{8}" oninput="this.value=this.value.replace(/[^0-9]/g, ''); validarCedulaJugador(this)" required>
 
         <br><br>
 
@@ -1850,10 +1942,34 @@ function cargarCategorias(){
 
 }
 
+function validarCedulaJugador(input){
+    const cedula = input.value;
+    if(cedula === ""){
+        input.setCustomValidity("");
+        return;
+    }
+
+    if(!/^[0-9]{8}$/.test(cedula)){
+        input.setCustomValidity("La cédula no es válida. Ingrese una correcta.");
+        return;
+    }
+
+    const pesos = [2, 9, 8, 7, 6, 3, 4];
+    const suma = pesos.reduce((total, peso, indice) => {
+        return total + ((Number(cedula[indice]) * peso) % 10);
+    }, 0);
+    const digitoVerificador = (10 - (suma % 10)) % 10;
+
+    input.setCustomValidity(
+        digitoVerificador === Number(cedula[7])
+            ? ""
+            : "La cédula no es válida. Ingrese una correcta."
+    );
+}
+
 // Comprueba en el navegador los datos requeridos y los límites de archivos.
 function validarJugador(){
 
-    let cedula = document.getElementById("cedulaJugador").value.trim();
     let nombre = document.getElementById("nombreJugador").value.trim();
     let apellido = document.getElementById("apellidoJugador").value.trim();
     let masa = document.getElementById("masaJugador").value;
@@ -1863,11 +1979,6 @@ function validarJugador(){
     let fechaNacimiento = document.getElementById("fechaNacimientoJugador").value;
     let club = document.getElementById("clubJugador").value;
     let categoria = document.getElementById("categoriaJugador").value;
-
-    if(!/^[0-9]{8}$/.test(cedula)){
-        alert("La cédula debe tener exactamente 8 números.");
-        return false;
-    }
 
     if(nombre.length < 3 || apellido.length < 3){
         alert("El nombre y el apellido deben tener al menos 3 caracteres.");
@@ -1931,7 +2042,7 @@ document.getElementById("contenido").innerHTML=`
 
 <h2>Modificar Jugador</h2>
 
-<form action="modificar_jugador.php" method="POST" onsubmit="return confirmarCambioJugador(this, 'modificar')">
+<form action="modificar_jugador.php" method="POST" enctype="multipart/form-data" onsubmit="return confirmarCambioJugador(this, 'modificar')">
 
 <label for="buscarJugadorModificar">Buscar jugador:</label>
 <div class="buscador-club-autocompletar">
@@ -1974,6 +2085,20 @@ document.getElementById("contenido").innerHTML=`
 
 <br><br>
 
+<div id="estadoArchivosJugadorModificar" role="status">Selecciona un jugador para consultar sus archivos.</div>
+
+<label for="fotoJugadorModificar">Foto del jugador (opcional):</label>
+<input type="file" id="fotoJugadorModificar" name="foto" accept="image/jpeg,image/png,image/webp" disabled>
+<br><br>
+
+<label for="aptitudJugadorModificar">Carnet de aptitud física (PDF, JPG o PNG):</label>
+<input type="file" id="aptitudJugadorModificar" name="aptitud_fisica" accept="application/pdf,image/jpeg,image/png" disabled>
+<br><br>
+
+<label for="vencimientoAptitudModificar">Vencimiento del carnet:</label>
+<input type="date" id="vencimientoAptitudModificar" name="fecha_vencimiento" disabled>
+<br><br>
+
 <button type="submit">
 Modificar
 </button>
@@ -1989,15 +2114,58 @@ configurarBuscadorJugador("buscarJugadorModificar", "sugerenciasJugadorModificar
     const fechaNacimiento = document.getElementById("fechaNacimientoModificar");
     const club = document.getElementById("clubModificarJugador");
     const categoria = document.getElementById("categoriaModificarJugador");
+    const estadoArchivos = document.getElementById("estadoArchivosJugadorModificar");
+    const foto = document.getElementById("fotoJugadorModificar");
+    const aptitud = document.getElementById("aptitudJugadorModificar");
+    const vencimientoAptitud = document.getElementById("vencimientoAptitudModificar");
+    foto.value = "";
+    aptitud.value = "";
+    vencimientoAptitud.value = "";
     cedula.value = jugador ? jugador.cedula : "";
     nombre.disabled = !jugador;
     apellido.disabled = !jugador;
     fechaNacimiento.disabled = !jugador;
     club.disabled = !jugador;
     categoria.disabled = !jugador;
+    foto.disabled = !jugador || Boolean(jugador.foto);
+    aptitud.disabled = !jugador || Boolean(jugador.archivo_aptitud);
+    vencimientoAptitud.disabled = !jugador || Boolean(jugador.archivo_aptitud);
+    vencimientoAptitud.required = false;
     nombre.value = jugador ? jugador.nombre : "";
     apellido.value = jugador ? jugador.apellido : "";
     fechaNacimiento.value = jugador ? jugador.fecha_nacimiento : "";
+    estadoArchivos.replaceChildren();
+
+    if(jugador){
+        const estadoFoto = document.createElement("p");
+        estadoFoto.textContent = jugador.foto ? "Foto: ya tiene una foto registrada." : "Foto: sin registrar; puedes agregarla.";
+        estadoArchivos.appendChild(estadoFoto);
+
+        if(jugador.foto){
+            const vistaPrevia = document.createElement("img");
+            vistaPrevia.src = `servir_archivo_jugador.php?tipo=foto&cedula=${encodeURIComponent(jugador.cedula)}`;
+            vistaPrevia.alt = `Foto de ${jugador.nombre}`;
+            vistaPrevia.width = 80;
+            vistaPrevia.height = 80;
+            vistaPrevia.style.objectFit = "cover";
+            estadoArchivos.appendChild(vistaPrevia);
+        }
+
+        const estadoAptitud = document.createElement("p");
+        estadoAptitud.textContent = jugador.archivo_aptitud ? "Aptitud física: ya tiene un carnet registrado." : "Aptitud física: sin registrar; puedes agregar el carnet.";
+        estadoArchivos.appendChild(estadoAptitud);
+
+        if(jugador.archivo_aptitud){
+            const enlaceAptitud = document.createElement("a");
+            enlaceAptitud.href = `servir_archivo_jugador.php?tipo=aptitud&cedula=${encodeURIComponent(jugador.cedula)}`;
+            enlaceAptitud.target = "_blank";
+            enlaceAptitud.rel = "noopener";
+            enlaceAptitud.textContent = "Ver carnet actual";
+            estadoArchivos.appendChild(enlaceAptitud);
+        }
+    } else {
+        estadoArchivos.textContent = "Selecciona un jugador para consultar sus archivos.";
+    }
 
     if(jugador){
         if(!Array.from(club.options).some(opcion => opcion.value === String(jugador.club_id))){
@@ -2012,6 +2180,15 @@ configurarBuscadorJugador("buscarJugadorModificar", "sugerenciasJugadorModificar
         club.value = "";
         categoria.value = "";
     }
+});
+
+document.getElementById("aptitudJugadorModificar").addEventListener("change", evento => {
+    const archivoAptitud = evento.currentTarget;
+    const fechaVencimiento = document.getElementById("vencimientoAptitudModificar");
+    const jugadorSeleccionado = Boolean(document.getElementById("cedulaJugadorModificar").value);
+    fechaVencimiento.disabled = !jugadorSeleccionado || archivoAptitud.disabled || !archivoAptitud.files.length;
+    fechaVencimiento.required = !fechaVencimiento.disabled;
+    if(fechaVencimiento.disabled) fechaVencimiento.value = "";
 });
 
 cargarClubesModificarJugador();

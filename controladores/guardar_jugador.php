@@ -2,6 +2,7 @@
 
 // Valida los datos y archivos del jugador, y registra ambos en forma consistente.
 require_once __DIR__ . "/../modelos/conexion.php";
+require_once __DIR__ . "/../modelos/validacion_cedula.php";
 require_admin();
 
 // Devuelve un mensaje y regresa al panel ante errores de validación.
@@ -74,6 +75,12 @@ $altura = trim($_POST['altura'] ?? '');
 $fecha_nacimiento = trim($_POST['fecha_nacimiento'] ?? '');
 $club_id = trim($_POST['club_id'] ?? '');
 $categoria_id = trim($_POST['categoria_id'] ?? '');
+$mensajeCedulaInvalida = 'La cédula no es válida. Ingrese una correcta.';
+
+if (!validarCedulaUruguaya($cedula)) {
+    regresarConError($mensajeCedulaInvalida);
+}
+
 $fechaNacimiento = DateTime::createFromFormat('!Y-m-d', $fecha_nacimiento);
 $erroresFecha = DateTime::getLastErrors();
 $fechaNacimientoValida = $fechaNacimiento !== false
@@ -83,8 +90,7 @@ $fechaNacimientoValida = $fechaNacimiento !== false
     && $fechaNacimiento->format('Y') <= '2019';
 
 if (
-    !preg_match('/^[0-9]{8}$/D', $cedula)
-    || preg_match('/^.{3,}$/us', $nombre) !== 1
+    preg_match('/^.{3,}$/us', $nombre) !== 1
     || preg_match('/^.{3,}$/us', $apellido) !== 1
     || !preg_match('/^[0-9]+(?:\.[0-9]{1,2})?$/D', $masa)
     || !preg_match('/^[0-9]+(?:\.[0-9]{1,2})?$/D', $altura)

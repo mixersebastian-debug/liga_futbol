@@ -124,6 +124,10 @@ tr:nth-child(even) td {
     overflow-x:auto;
 }
 
+.tabla-jugadores-contenedor table{
+    min-width:1250px;
+}
+
 .aviso-aptitud{
     margin:0 0 16px;
     padding:12px 14px;

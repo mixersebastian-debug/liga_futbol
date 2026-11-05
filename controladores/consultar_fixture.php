@@ -15,7 +15,8 @@ SELECT
     categorias.nombre AS nombre_categoria,
     partidos.fecha,
     partidos.estado,
-    partidos.resultado
+    partidos.resultado,
+    partidos.velocidad_maxima_balon_kmh
 FROM partidos
 
 INNER JOIN clubes AS clubes_local
@@ -91,6 +92,8 @@ tr:nth-child(even) td {
 
 </style>
 
+<p>La velocidad indicada es simulada automáticamente (25–65 km/h); no es una medición real del partido.</p>
+
 ";
 
 // Presenta las columnas que describen un encuentro.
@@ -103,6 +106,7 @@ echo "
     <th>Local</th>
     <th>Visitante</th>
     <th>Resultado</th>
+    <th>Velocidad máxima de la pelota (simulada)</th>
     <th>Estado</th>
     ".($esAdministrador ? "<th>Actualizar</th>" : "")."
 </tr>
@@ -113,7 +117,7 @@ if (mysqli_num_rows($resultado) == 0) {
 
     echo "
     <tr>
-        <td colspan='".($esAdministrador ? "7" : "6")."'>
+        <td colspan='".($esAdministrador ? "8" : "7")."'>
             No hay partidos registrados.
         </td>
     </tr>
@@ -133,6 +137,9 @@ if (mysqli_num_rows($resultado) == 0) {
             "suspendido" => "Suspendido"
         ][$fila["estado"]] ?? "Pendiente";
         $fechaEtiqueta = $fila["fecha"] ?: "Sin fecha";
+        $velocidadSimulada = $fila["velocidad_maxima_balon_kmh"] !== null
+            ? (int) $fila["velocidad_maxima_balon_kmh"] . " km/h (simulada)"
+            : ($resultado_partido !== "" ? "Sin goles" : "Sin dato");
         $filaAdmin = "";
         if ($esAdministrador) {
             $opcionesEstado = "";
@@ -166,6 +173,7 @@ if (mysqli_num_rows($resultado) == 0) {
             <td>".htmlspecialchars((string) $fila['nombre_local'], ENT_QUOTES, 'UTF-8')."</td>
             <td>".htmlspecialchars((string) $fila['nombre_visitante'], ENT_QUOTES, 'UTF-8')."</td>
             <td>".htmlspecialchars((string) $resultado_partido, ENT_QUOTES, 'UTF-8')."</td>
+            <td>".htmlspecialchars($velocidadSimulada, ENT_QUOTES, 'UTF-8')."</td>
             <td>".htmlspecialchars($estadoEtiqueta, ENT_QUOTES, 'UTF-8')."</td>
             ".$filaAdmin."
         </tr>

@@ -75,6 +75,14 @@ tr:nth-child(even) td {
     background-color: #0b1017;
 }
 
+.tabla-jugadores-contenedor {
+    overflow-x: auto;
+}
+
+.tabla-jugadores-contenedor table {
+    min-width: 1400px;
+}
+
 .aviso-aptitud{
     margin:0 0 16px;
     padding:12px 14px;
@@ -130,6 +138,7 @@ if ($jugadoresSinAptitud) {
 }
 
 // Escribe los encabezados de la lista de jugadores.
+echo '<div class="tabla-jugadores-contenedor">';
 echo "<table>";
 
 echo "
@@ -149,7 +158,6 @@ echo "
 
 // Renderiza los datos del jugador y los enlaces a sus archivos si existen.
 foreach ($jugadores as $fila) {
-
     echo "
     <tr>
         <td>".htmlspecialchars($fila['cedula'], ENT_QUOTES, 'UTF-8')."</td>
@@ -171,5 +179,6 @@ foreach ($jugadores as $fila) {
 }
 
 echo "</table>";
+echo "</div>";
 
 ?>
