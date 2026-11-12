@@ -465,6 +465,7 @@ body.modo-claro{
 
 </footer>
 
+<script src="<?php echo strpos($_SERVER["SCRIPT_NAME"], "/vistas/") !== false ? "desplazamiento_horizontal.js" : "vistas/desplazamiento_horizontal.js"; ?>"></script>
 <script>
 
 function confirmarCierreSesion(){
@@ -487,6 +488,7 @@ function alternarModoClaro(){
 }
 
 aplicarTema();
+activarDesplazamientoHorizontal(document);
 
 // Recupera la tabla de posiciones usando los filtros actualmente elegidos.
 function cargarTablaPosiciones(){

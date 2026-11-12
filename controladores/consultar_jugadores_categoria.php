@@ -212,11 +212,22 @@ if ($jugadoresSinAptitud) {
     echo '<section class="aviso-aptitud" role="status">';
     echo '<h3>Aviso: ' . count($jugadoresSinAptitud) . ' jugador(es) sin aptitud física registrada</h3>';
     echo '<ul>';
-    foreach ($jugadoresSinAptitud as $jugadorSinAptitud) {
+    foreach (array_slice($jugadoresSinAptitud, 0, 2) as $jugadorSinAptitud) {
         $nombreCompleto = $jugadorSinAptitud['nombre'] . ' ' . $jugadorSinAptitud['apellido'];
         echo '<li>' . htmlspecialchars($nombreCompleto, ENT_QUOTES, 'UTF-8') . '</li>';
     }
-    echo '</ul></section>';
+    echo '</ul>';
+    if (count($jugadoresSinAptitud) > 2) {
+        echo '<details class="aviso-aptitud-mas">';
+        echo '<summary>Ver más (' . (count($jugadoresSinAptitud) - 2) . ')</summary>';
+        echo '<ul>';
+        foreach (array_slice($jugadoresSinAptitud, 2) as $jugadorSinAptitud) {
+            $nombreCompleto = $jugadorSinAptitud['nombre'] . ' ' . $jugadorSinAptitud['apellido'];
+            echo '<li>' . htmlspecialchars($nombreCompleto, ENT_QUOTES, 'UTF-8') . '</li>';
+        }
+        echo '</ul></details>';
+    }
+    echo '</section>';
 }
 
 // Presenta las columnas que se mostrarán para cada jugador.
@@ -229,6 +240,7 @@ echo "
     <th>Nombre</th>
     <th>Apellido</th>
     <th>Masa (kg)</th>
+    <th>Fuerza peso (N)</th>
     <th>Altura (m)</th>
     <th>Foto</th>
     <th>Aptitud física / vigencia</th>
@@ -245,7 +257,7 @@ if (count($jugadores) === 0) {
 
     echo "
     <tr>
-        <td colspan='".(($club_id_usuario !== null && $club_id_consultado === $club_id_usuario) ? "10" : "9")."'>No hay jugadores registrados en esta categoría.</td>
+        <td colspan='".(($club_id_usuario !== null && $club_id_consultado === $club_id_usuario) ? "11" : "10")."'>No hay jugadores registrados en esta categoría.</td>
     </tr>
     ";
 
@@ -254,6 +266,9 @@ if (count($jugadores) === 0) {
     // Renderiza cada jugador y los enlaces disponibles a sus documentos.
     foreach ($jugadores as $fila) {
         $nombreCompleto = htmlspecialchars($fila['nombre'] . ' ' . $fila['apellido'], ENT_QUOTES, 'UTF-8');
+        $fuerzaPeso = $fila['masa'] !== null
+            ? number_format((float) $fila['masa'] * 9.81, 2, ',', '.') . ' N'
+            : 'Sin registrar';
         $fechaVencimiento = $fila['fecha_vencimiento'] ?? '';
         if (empty($fila['archivo_aptitud'])) {
             $estadoAptitud = '<span class="aptitud-sin-vigencia">Sin carnet</span>';
@@ -271,6 +286,7 @@ if (count($jugadores) === 0) {
             <td>".htmlspecialchars($fila['nombre'], ENT_QUOTES, 'UTF-8')."</td>
             <td>".htmlspecialchars($fila['apellido'], ENT_QUOTES, 'UTF-8')."</td>
             <td>".htmlspecialchars($fila['masa'] ?? 'Sin registrar', ENT_QUOTES, 'UTF-8')."</td>
+            <td>".htmlspecialchars($fuerzaPeso, ENT_QUOTES, 'UTF-8')."</td>
             <td>".htmlspecialchars($fila['altura'] ?? 'Sin registrar', ENT_QUOTES, 'UTF-8')."</td>
             <td>".(!empty($fila['foto'])
                 ? "<img src=\"servir_archivo_jugador.php?tipo=foto&amp;cedula=".rawurlencode($fila['cedula'])."\" alt=\"Foto de ".htmlspecialchars($fila['nombre'], ENT_QUOTES, 'UTF-8')."\" width=\"72\" height=\"72\" style=\"object-fit:cover;border-radius:50%;\">"

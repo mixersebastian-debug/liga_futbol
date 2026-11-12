@@ -14,13 +14,14 @@ function obtenerFiltroId($valor) {
 }
 
 // Crea una fila de estadísticas para el par categoría-club si aún no existe.
-function asegurarEquipo(&$equipos, $categoria_id, $categoria, $club_id, $club, $logo = null) {
-    $clave = $categoria_id . ':' . $club_id;
+function asegurarEquipo(&$equipos, $categoria_id, $categoria, $copa, $club_id, $club, $logo = null) {
+    $clave = $categoria_id . ':' . $copa . ':' . $club_id;
 
     if (!isset($equipos[$clave])) {
         $equipos[$clave] = [
             'categoria_id' => (int) $categoria_id,
             'categoria' => $categoria,
+            'copa' => $copa,
             'club_id' => (int) $club_id,
             'club' => $club,
             'logo' => $logo,
@@ -40,6 +41,11 @@ function asegurarEquipo(&$equipos, $categoria_id, $categoria, $club_id, $club, $
 // Lee los filtros opcionales de categoría y club enviados por la interfaz.
 $categoria_seleccionada = obtenerFiltroId($_GET['categoria_id'] ?? '');
 $club_seleccionado = $club_id_usuario ?? obtenerFiltroId($_GET['club_id'] ?? '');
+$copas = ['oro' => 'Oro', 'plata' => 'Plata', 'bronce' => 'Bronce'];
+$copa_solicitada = $_GET['copa'] ?? '';
+$copa_seleccionada = is_string($copa_solicitada) && isset($copas[$copa_solicitada])
+    ? $copa_solicitada
+    : '';
 
 // Recupera los valores válidos de los filtros que se mostrarán al usuario.
 $resultado_categorias = mysqli_query($conexion, "SELECT id, nombre FROM categorias ORDER BY nombre");
@@ -82,6 +88,7 @@ while ($fila = mysqli_fetch_assoc($resultado_equipos)) {
         $equipos,
         $fila['categoria_id'],
         $fila['categoria'],
+        'oro',
         $fila['club_id'],
         $fila['club'],
         $fila['logo']
@@ -93,6 +100,7 @@ $sql_partidos = "
     SELECT
         partidos.categoria_id,
         categorias.nombre AS categoria,
+        partidos.copa,
         partidos.club_local,
         clubes_local.nombre AS nombre_local,
         clubes_local.logo AS logo_local,
@@ -119,6 +127,7 @@ while ($partido = mysqli_fetch_assoc($resultado_partidos)) {
         $equipos,
         $partido['categoria_id'],
         $partido['categoria'],
+        $partido['copa'],
         $partido['club_local'],
         $partido['nombre_local'],
         $partido['logo_local']
@@ -127,6 +136,7 @@ while ($partido = mysqli_fetch_assoc($resultado_partidos)) {
         $equipos,
         $partido['categoria_id'],
         $partido['categoria'],
+        $partido['copa'],
         $partido['club_visitante'],
         $partido['nombre_visitante'],
         $partido['logo_visitante']
@@ -178,8 +188,14 @@ if ($club_id_usuario !== null) {
     }
 }
 
-// Ordena por categoría y luego por puntos, diferencia, goles y nombre del club.
+// Ordena por copa, categoría y luego por puntos, diferencia, goles y nombre del club.
 usort($equipos, function ($a, $b) {
+    $ordenCopas = ['oro' => 0, 'plata' => 1, 'bronce' => 2];
+    $comparacion = ($ordenCopas[$a['copa']] ?? 3) <=> ($ordenCopas[$b['copa']] ?? 3);
+    if ($comparacion !== 0) {
+        return $comparacion;
+    }
+
     $comparacion = strcasecmp($a['categoria'], $b['categoria']);
     if ($comparacion !== 0) {
         return $comparacion;
@@ -199,8 +215,17 @@ function escapar($valor) {
     return htmlspecialchars((string) $valor, ENT_QUOTES, 'UTF-8');
 }
 
-// Construye filtros para limitar la tabla a una categoría o club.
+// Construye filtros para limitar la tabla a una copa, categoría o club.
 echo '<div class="tabla-posiciones-filtros">';
+echo '<label for="filtroCopaPosiciones">Copa:';
+echo '<select id="filtroCopaPosiciones" onchange="cargarTablaPosiciones()">';
+echo '<option value="">Todas las copas</option>';
+foreach ($copas as $valor => $nombre) {
+    $seleccionada = $copa_seleccionada === $valor ? ' selected' : '';
+    echo '<option value="' . escapar($valor) . '"' . $seleccionada . '>' . escapar($nombre) . '</option>';
+}
+echo '</select></label>';
+
 echo '<label for="filtroCategoriaPosiciones">Categoría:';
 echo '<select id="filtroCategoriaPosiciones" onchange="cargarTablaPosiciones()">';
 echo '<option value="">Todas las categorías</option>';
@@ -233,21 +258,24 @@ echo '</div>';
 echo '<div class="tabla-posiciones-contenedor">';
 echo '<table class="tabla-posiciones">';
 echo '<thead><tr>';
-echo '<th>Pos.</th><th>Categoría</th><th>Escudo</th><th>Club</th><th>PJ</th><th>PG</th><th>PE</th><th>PP</th><th>GF</th><th>GC</th><th>DG</th><th>Pts</th>';
+echo '<th>Pos.</th><th>Copa</th><th>Categoría</th><th>Escudo</th><th>Club</th><th>PJ</th><th>PG</th><th>PE</th><th>PP</th><th>GF</th><th>GC</th><th>DG</th><th>Pts</th>';
 echo '</tr></thead><tbody>';
 
-// Muestra equipos ordenados, aplica filtros y numera posiciones dentro de categoría.
+// Muestra equipos ordenados, aplica filtros y numera posiciones dentro de copa y categoría.
 if (count($equipos) === 0) {
-    echo '<tr><td colspan="12">Todavía no hay equipos registrados en categorías.</td></tr>';
+    echo '<tr><td colspan="13">Todavía no hay equipos registrados en categorías.</td></tr>';
 } else {
     $posiciones = [];
     $equipos_mostrados = 0;
 
     foreach ($equipos as $equipo) {
         $categoria_id = $equipo['categoria_id'];
-        $posiciones[$categoria_id] = ($posiciones[$categoria_id] ?? 0) + 1;
+        $grupo_posiciones = $equipo['copa'] . ':' . $categoria_id;
+        $posiciones[$grupo_posiciones] = ($posiciones[$grupo_posiciones] ?? 0) + 1;
 
         if (
+            ($copa_seleccionada !== '' && $equipo['copa'] !== $copa_seleccionada)
+            ||
             ($categoria_seleccionada !== 0 && $categoria_id !== $categoria_seleccionada)
             || ($club_seleccionado !== 0 && $equipo['club_id'] !== $club_seleccionado)
         ) {
@@ -256,7 +284,8 @@ if (count($equipos) === 0) {
 
         $equipos_mostrados++;
         echo '<tr>';
-        echo '<td>' . $posiciones[$categoria_id] . '</td>';
+        echo '<td>' . $posiciones[$grupo_posiciones] . '</td>';
+        echo '<td>' . escapar($copas[$equipo['copa']] ?? ucfirst($equipo['copa'])) . '</td>';
         echo '<td>' . escapar($equipo['categoria']) . '</td>';
         echo '<td>' . (!empty($equipo['logo'])
             ? '<img class="escudo-posiciones" src="servir_logo_club.php?club_id=' . $equipo['club_id'] . '" alt="Escudo de ' . escapar($equipo['club']) . '">'
@@ -274,7 +303,7 @@ if (count($equipos) === 0) {
     }
 
     if ($equipos_mostrados === 0) {
-        echo '<tr><td colspan="12">No hay equipos que coincidan con los filtros seleccionados.</td></tr>';
+        echo '<tr><td colspan="13">No hay equipos que coincidan con los filtros seleccionados.</td></tr>';
     }
 }
 

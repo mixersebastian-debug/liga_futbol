@@ -7,6 +7,9 @@ require_once __DIR__ . '/../modelos/conexion.php';
 $sql = "
 SELECT
     partidos.id,
+    partidos.club_local,
+    partidos.club_visitante,
+    partidos.categoria_id,
     clubes_local.nombre AS nombre_local,
     clubes_visitante.nombre AS nombre_visitante,
     categorias.nombre AS nombre_categoria,
@@ -48,7 +51,10 @@ while ($fila = mysqli_fetch_assoc($resultado)) {
     $estadoEtiqueta = $etiquetasEstado[$fila["estado"]] ?? "Pendiente";
 
     echo "
-    <option value='".$fila['id']."'>
+    <option value='".(int) $fila['id']."'
+        data-club-local='".(int) $fila['club_local']."'
+        data-club-visitante='".(int) $fila['club_visitante']."'
+        data-categoria='".(int) $fila['categoria_id']."'>
         ".htmlspecialchars((string) ($fila['fecha'] ?? 'Sin fecha'), ENT_QUOTES, 'UTF-8')." - ".
         htmlspecialchars($fila['nombre_categoria'], ENT_QUOTES, 'UTF-8')." - ".
         htmlspecialchars($fila['nombre_local'], ENT_QUOTES, 'UTF-8')." vs ".

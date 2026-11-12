@@ -283,6 +283,28 @@ main{
     width:100%;
 }
 
+.buscador-consulta-jugadores{
+    display:grid;
+    gap:6px;
+    max-width:440px;
+    margin:16px 0;
+}
+
+.buscador-consulta-jugadores input{
+    box-sizing:border-box;
+    width:100%;
+    padding:10px;
+    border:1px solid #52657a;
+    border-radius:5px;
+    background:#0b1017;
+    color:#f5f7fa;
+    font:15px Arial,sans-serif;
+}
+
+.estado-busqueda-jugadores{
+    min-height:1.2em;
+}
+
 .sugerencias-club{
     position:absolute;
     z-index:20;
@@ -614,6 +636,8 @@ body.modo-claro{
 
 <button onclick="mostrarJugadores()">Jugadores</button>
 
+<button onclick="mostrarEstadisticasJugadores()">Estadisticas De Jugadores</button>
+
 <button onclick="mostrarCategorias()">Categorías</button>
 
 <button onclick="mostrarPartidos()">Partidos</button>
@@ -651,6 +675,7 @@ body.modo-claro{
 </footer>
 
 
+<script src="<?php echo strpos($_SERVER["SCRIPT_NAME"], "/vistas/") !== false ? "desplazamiento_horizontal.js" : "vistas/desplazamiento_horizontal.js"; ?>"></script>
 <script>
 
 function confirmarCierreSesion(){
@@ -674,6 +699,11 @@ function aplicarTemaIframe(iframe){
         return;
     }
 
+    activarDesplazamientoHorizontal(documento);
+    documento.querySelectorAll("[data-liga-scroll-top]").forEach(barra => {
+        barra.style.background = document.body.classList.contains("modo-claro") ? "#dce6f0" : "#171e28";
+    });
+
     let estilo = documento.getElementById("tema-claro-iframe");
 
     if(!estilo){
@@ -694,10 +724,13 @@ function aplicarTema(){
 
     const botonTema = document.getElementById("botonTema");
     botonTema.textContent = modoClaro ? "Modo oscuro" : "Modo claro";
+    document.querySelectorAll("[data-liga-scroll-top]").forEach(barra => {
+        barra.style.background = modoClaro ? "#dce6f0" : "#171e28";
+    });
 
     document.querySelectorAll("iframe").forEach(iframe => {
         aplicarTemaIframe(iframe);
-        iframe.addEventListener("load", () => aplicarTemaIframe(iframe), { once: true });
+        iframe.addEventListener("load", () => aplicarTemaIframe(iframe));
     });
 }
 
@@ -713,27 +746,33 @@ const observadorIframes = new MutationObserver(cambios => {
     cambios.forEach(cambio => {
         cambio.addedNodes.forEach(nodo => {
             if(nodo instanceof HTMLIFrameElement){
-                nodo.addEventListener("load", () => aplicarTemaIframe(nodo), { once: true });
+                nodo.addEventListener("load", () => aplicarTemaIframe(nodo));
             } else if(nodo.querySelectorAll){
                 nodo.querySelectorAll("iframe").forEach(iframe => {
-                    iframe.addEventListener("load", () => aplicarTemaIframe(iframe), { once: true });
+                    iframe.addEventListener("load", () => aplicarTemaIframe(iframe));
                 });
             }
         });
     });
 });
 observadorIframes.observe(document.body, { childList: true, subtree: true });
+activarDesplazamientoHorizontal(document);
 aplicarTema();
 
 // Recupera la categoría y el club seleccionados y vuelve a cargar la tabla.
 function cargarTablaPosiciones(){
     const contenedor = document.getElementById("tablaPosiciones");
     const parametros = new URLSearchParams();
+    const filtroCopa = contenedor.querySelector("#filtroCopaPosiciones");
     const filtroCategoria = contenedor.querySelector("#filtroCategoriaPosiciones");
     const filtroClub = contenedor.querySelector("#filtroClubPosiciones");
+    const copa = filtroCopa ? filtroCopa.value : "";
     const categoria = filtroCategoria ? filtroCategoria.value : "";
     const club = filtroClub ? filtroClub.value : "";
 
+    if(copa){
+        parametros.set("copa", copa);
+    }
     if(categoria){
         parametros.set("categoria_id", categoria);
     }
@@ -909,6 +948,85 @@ document.getElementById("contenido").innerHTML=construirSeccion("Jugadores", "Ge
         if(contenedor) contenedor.textContent = "No se pudo cargar el resumen de jugadores.";
     });
 
+}
+
+// Muestra las estadísticas individuales de tarjetas registradas para cada jugador.
+function mostrarEstadisticasJugadores(){
+    document.getElementById("contenido").innerHTML = `
+        <h2>Estadisticas De Jugadores</h2>
+        <p>Tarjetas amarillas y rojas registradas por jugador.</p>
+        <div class="buscador-consulta-jugadores">
+            <label for="buscarEstadisticasJugador">Buscar jugador por nombre, apellido o cédula:</label>
+            <input type="search" id="buscarEstadisticasJugador" placeholder="Escribe nombre, apellido o cédula" autocomplete="off" oninput="filtrarEstadisticasJugadores()">
+        </div>
+        <p id="estadoBusquedaEstadisticas" class="estado-busqueda-jugadores" role="status" aria-live="polite"></p>
+        <div id="estadisticasJugadores">Cargando estadísticas de jugadores...</div>
+    `;
+
+    fetch("consultar_estadisticas_jugadores.php")
+    .then(response => {
+        if(!response.ok){
+            throw new Error("No se pudieron consultar las estadísticas de jugadores.");
+        }
+        return response.text();
+    })
+    .then(html => {
+        const contenedor = document.getElementById("estadisticasJugadores");
+        if(contenedor){
+            contenedor.innerHTML = html;
+            filtrarEstadisticasJugadores();
+        }
+    })
+    .catch(error => {
+        console.error(error);
+        const contenedor = document.getElementById("estadisticasJugadores");
+        if(contenedor) contenedor.textContent = "No se pudieron cargar las estadísticas de jugadores.";
+    });
+}
+
+function normalizarBusquedaJugador(valor){
+    return String(valor)
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLocaleLowerCase("es")
+        .trim();
+}
+
+function filtrarEstadisticasJugadores(){
+    const buscador = document.getElementById("buscarEstadisticasJugador");
+    const tabla = document.querySelector("#estadisticasJugadores .tabla-estadisticas-jugadores");
+    const estado = document.getElementById("estadoBusquedaEstadisticas");
+    if(!buscador || !tabla) return;
+
+    const busqueda = normalizarBusquedaJugador(buscador.value);
+    const filas = Array.from(tabla.tBodies).flatMap(cuerpo => Array.from(cuerpo.rows))
+        .filter(fila => !fila.hasAttribute("data-liga-sin-resultados"));
+    let cantidadVisible = 0;
+    const totales = {jugadores: 0, goles: 0, asistencias: 0, amarillas: 0, rojas: 0, tarjetas: 0};
+
+    filas.forEach(fila => {
+        const celdas = Array.from(fila.cells).map(celda => celda.textContent);
+        const textoFila = `${fila.dataset.busqueda || ""} ${celdas.join(" ")}`;
+        const coincide = !busqueda || normalizarBusquedaJugador(textoFila).includes(busqueda);
+        fila.hidden = !coincide;
+        if(!coincide) return;
+
+        cantidadVisible++;
+        totales.jugadores++;
+        totales.goles += Number(fila.cells[3]?.textContent.trim()) || 0;
+        totales.asistencias += Number(fila.cells[4]?.textContent.trim()) || 0;
+        totales.amarillas += Number(fila.cells[5]?.textContent.trim()) || 0;
+        totales.rojas += Number(fila.cells[6]?.textContent.trim()) || 0;
+        totales.tarjetas += Number(fila.cells[7]?.textContent.trim()) || 0;
+    });
+
+    Object.entries(totales).forEach(([nombre, valor]) => {
+        const total = document.querySelector(`[data-estadistica-total="${nombre}"]`);
+        if(total) total.textContent = String(valor);
+    });
+    if(estado){
+        estado.textContent = busqueda && cantidadVisible === 0 ? "No se encontraron jugadores." : "";
+    }
 }
 
 // Lista las categorías disponibles y muestra sus estadísticas.
@@ -1165,7 +1283,7 @@ function agregarPartido(){
 
     <h2>Crear Partido</h2>
 
-    <form action="guardar_partido.php" method="POST">
+    <form id="formCrearPartido" action="guardar_partido.php" method="POST">
 
         <label>Club local:</label>
 
@@ -1197,9 +1315,20 @@ function agregarPartido(){
 
         <br><br>
 
+        <label>Copa:</label>
+        <select id="copaPartido" name="copa" required>
+            <option value="">Seleccione una copa</option>
+            <option value="oro">Copa de Oro</option>
+            <option value="plata">Copa de Plata</option>
+            <option value="bronce">Copa de Bronce</option>
+        </select>
+
+        <br><br>
+
         <label>Estado:</label>
         <select id="estadoPartidoNuevo" name="estado" required>
             <option value="programado">Programado</option>
+            <option value="jugado">Jugado</option>
             <option value="pendiente">Pendiente</option>
             <option value="suspendido">Suspendido</option>
             <option value="sin_fecha">Sin fecha</option>
@@ -1211,6 +1340,30 @@ function agregarPartido(){
         <input type="date" id="fechaPartidoNuevo" name="fecha" min="<?php echo date('Y'); ?>-01-01">
 
         <br><br>
+
+        <div id="resultadoPartidoNuevoContenedor" hidden>
+            <label for="resultadoPartidoNuevo">Resultado (local - visitante):</label>
+            <input type="text" id="resultadoPartidoNuevo" name="resultado" inputmode="numeric" pattern="[0-9]{1,3}[ ]*-[ ]*[0-9]{1,3}" placeholder="Ej.: 2 - 1">
+            <br><br>
+        </div>
+
+            <section id="goleadoresNuevo" hidden>
+                <h3>Goleadores del partido</h3>
+                <p>Asigna los goles y las asistencias a los jugadores de cada equipo. Los goles deben coincidir con el marcador; puede haber goles sin asistencia.</p>
+                <h4>Equipo local</h4>
+                <div id="goleadoresNuevoLocal"></div>
+                <button type="button" id="agregarGoleadorNuevoLocal">Agregar goleador local</button>
+                <h4>Asistencias del equipo local</h4>
+                <div id="asistenciasNuevoLocal"></div>
+                <button type="button" id="agregarAsistenciaNuevoLocal">Agregar asistente local</button>
+                <h4>Equipo visitante</h4>
+                <div id="goleadoresNuevoVisitante"></div>
+                <button type="button" id="agregarGoleadorNuevoVisitante">Agregar goleador visitante</button>
+                <h4>Asistencias del equipo visitante</h4>
+                <div id="asistenciasNuevoVisitante"></div>
+                <button type="button" id="agregarAsistenciaNuevoVisitante">Agregar asistente visitante</button>
+                <br><br>
+            </section>
 
         <button type="submit">
             Guardar Partido
@@ -1229,18 +1382,34 @@ function agregarPartido(){
     cargarClubesPartido();
     cargarCategoriasPartido();
     configurarFechaPartidoNuevo();
+    configurarCapturaGoleadores({
+        formularioId: "formCrearPartido",
+        estadoId: "estadoPartidoNuevo",
+        resultadoId: "resultadoPartidoNuevo",
+        seccionId: "goleadoresNuevo",
+        categoriaId: "categoriaPartido",
+        equipos: [
+            {clubId: "clubLocal", contenedorId: "goleadoresNuevoLocal", botonId: "agregarGoleadorNuevoLocal", nombre: "goleadores_local", asistenciasContenedorId: "asistenciasNuevoLocal", asistenciasBotonId: "agregarAsistenciaNuevoLocal", asistenciasNombre: "asistencias_local"},
+            {clubId: "clubVisitante", contenedorId: "goleadoresNuevoVisitante", botonId: "agregarGoleadorNuevoVisitante", nombre: "goleadores_visitante", asistenciasContenedorId: "asistenciasNuevoVisitante", asistenciasBotonId: "agregarAsistenciaNuevoVisitante", asistenciasNombre: "asistencias_visitante"}
+        ]
+    });
 
 }
 
 function configurarFechaPartidoNuevo(){
     const estado = document.getElementById("estadoPartidoNuevo");
     const fecha = document.getElementById("fechaPartidoNuevo");
-    if(!estado || !fecha) return;
+    const resultadoContenedor = document.getElementById("resultadoPartidoNuevoContenedor");
+    const resultado = document.getElementById("resultadoPartidoNuevo");
+    if(!estado || !fecha || !resultadoContenedor || !resultado) return;
 
     const actualizar = () => {
         fecha.required = estado.value !== "sin_fecha";
         fecha.disabled = estado.value === "sin_fecha";
         if(fecha.disabled) fecha.value = "";
+        resultadoContenedor.hidden = estado.value !== "jugado";
+        resultado.required = estado.value === "jugado";
+        if(!resultado.required) resultado.value = "";
     };
     estado.addEventListener("change", actualizar);
     actualizar();
@@ -1340,7 +1509,7 @@ function registrarResultado(){
 
     <h2>Registrar Resultado</h2>
 
-    <form action="guardar_resultado.php" method="POST">
+    <form id="formRegistrarResultado" action="guardar_resultado.php" method="POST">
 
         <label>Partido:</label>
 
@@ -1350,12 +1519,17 @@ function registrarResultado(){
 
         </select>
 
+        <input type="hidden" id="clubLocalResultado">
+        <input type="hidden" id="clubVisitanteResultado">
+        <input type="hidden" id="categoriaResultado">
+
         <br><br>
 
         <label>Resultado:</label>
 
         <input
             type="text"
+            id="marcadorResultado"
             name="resultado"
             placeholder="Ejemplo: 2 - 1"
             pattern="[0-9]{1,3}\\s*-\\s*[0-9]{1,3}"
@@ -1369,6 +1543,24 @@ function registrarResultado(){
         <input type="date" id="fechaResultadoPartido" name="fecha" min="<?php echo date('Y'); ?>-01-01">
 
         <br><br>
+
+        <section id="goleadoresResultado" hidden>
+            <h3>Goleadores del partido</h3>
+            <p>Asigna los goles y las asistencias a los jugadores de cada equipo. Los goles deben coincidir con el marcador; puede haber goles sin asistencia.</p>
+            <h4>Equipo local</h4>
+            <div id="goleadoresResultadoLocal"></div>
+            <button type="button" id="agregarGoleadorResultadoLocal">Agregar goleador local</button>
+            <h4>Asistencias del equipo local</h4>
+            <div id="asistenciasResultadoLocal"></div>
+            <button type="button" id="agregarAsistenciaResultadoLocal">Agregar asistente local</button>
+            <h4>Equipo visitante</h4>
+            <div id="goleadoresResultadoVisitante"></div>
+            <button type="button" id="agregarGoleadorResultadoVisitante">Agregar goleador visitante</button>
+            <h4>Asistencias del equipo visitante</h4>
+            <div id="asistenciasResultadoVisitante"></div>
+            <button type="button" id="agregarAsistenciaResultadoVisitante">Agregar asistente visitante</button>
+            <br><br>
+        </section>
 
         <button type="submit">
             Guardar Resultado
@@ -1385,6 +1577,26 @@ function registrarResultado(){
     `;
 
     cargarPartidosResultado();
+    configurarCapturaGoleadores({
+        formularioId: "formRegistrarResultado",
+        resultadoId: "marcadorResultado",
+        seccionId: "goleadoresResultado",
+        categoriaId: "categoriaResultado",
+        equipos: [
+            {clubId: "clubLocalResultado", contenedorId: "goleadoresResultadoLocal", botonId: "agregarGoleadorResultadoLocal", nombre: "goleadores_local", asistenciasContenedorId: "asistenciasResultadoLocal", asistenciasBotonId: "agregarAsistenciaResultadoLocal", asistenciasNombre: "asistencias_local"},
+            {clubId: "clubVisitanteResultado", contenedorId: "goleadoresResultadoVisitante", botonId: "agregarGoleadorResultadoVisitante", nombre: "goleadores_visitante", asistenciasContenedorId: "asistenciasResultadoVisitante", asistenciasBotonId: "agregarAsistenciaResultadoVisitante", asistenciasNombre: "asistencias_visitante"}
+        ]
+    });
+    document.getElementById("partidoResultado").addEventListener("change", event => {
+        const partido = event.target.selectedOptions[0];
+        document.getElementById("clubLocalResultado").value = partido.dataset.clubLocal || "";
+        document.getElementById("clubVisitanteResultado").value = partido.dataset.clubVisitante || "";
+        const categoria = document.getElementById("categoriaResultado");
+        categoria.value = partido.dataset.categoria || "";
+        categoria.dispatchEvent(new Event("change"));
+        document.getElementById("clubLocalResultado").dispatchEvent(new Event("change"));
+        document.getElementById("clubVisitanteResultado").dispatchEvent(new Event("change"));
+    });
 
 }
 
@@ -1405,6 +1617,139 @@ function cargarPartidosResultado(){
     });
 
 }   
+
+function configurarCapturaGoleadores(configuracion){
+    const formulario = document.getElementById(configuracion.formularioId);
+    const estado = configuracion.estadoId ? document.getElementById(configuracion.estadoId) : null;
+    const resultado = document.getElementById(configuracion.resultadoId);
+    const seccion = document.getElementById(configuracion.seccionId);
+    const categoria = configuracion.categoriaId
+        ? document.getElementById(configuracion.categoriaId)
+        : null;
+    if(!formulario || !resultado || !seccion) return;
+
+    const equipos = configuracion.equipos.map(equipo => ({
+        ...equipo,
+        club: document.getElementById(equipo.clubId),
+        contenedor: document.getElementById(equipo.contenedorId),
+        boton: document.getElementById(equipo.botonId),
+        asistenciasContenedor: document.getElementById(equipo.asistenciasContenedorId),
+        asistenciasBoton: document.getElementById(equipo.asistenciasBotonId),
+        opciones: [],
+        siguienteIndice: 0,
+        siguienteIndiceAsistencia: 0,
+        solicitud: 0
+    }));
+
+    function agregarFilaAporte(equipo, esAsistencia){
+        const fila = document.createElement("div");
+        fila.className = "fila-goleador";
+        const selector = document.createElement("select");
+        const indice = esAsistencia ? equipo.siguienteIndiceAsistencia++ : equipo.siguienteIndice++;
+        const nombre = esAsistencia ? equipo.asistenciasNombre : equipo.nombre;
+        selector.name = `${nombre}[${indice}][cedula]`;
+        selector.add(new Option("Seleccione un jugador", ""));
+        equipo.opciones.forEach(jugador => selector.add(new Option(jugador.nombre, jugador.cedula)));
+
+        const cantidad = document.createElement("input");
+        cantidad.type = "number";
+        cantidad.name = esAsistencia
+            ? `${nombre}[${indice}][cantidad]`
+            : `${nombre}[${indice}][goles]`;
+        cantidad.min = "0";
+        cantidad.max = "999";
+        cantidad.value = "0";
+        cantidad.setAttribute("aria-label", esAsistencia ? "Cantidad de asistencias" : "Cantidad de goles");
+
+        const quitar = document.createElement("button");
+        quitar.type = "button";
+        quitar.textContent = "Quitar";
+        quitar.addEventListener("click", () => fila.remove());
+
+        fila.append(selector, cantidad, quitar);
+        (esAsistencia ? equipo.asistenciasContenedor : equipo.contenedor).appendChild(fila);
+    }
+
+    async function cargarJugadoresEquipo(equipo){
+        const solicitud = ++equipo.solicitud;
+        equipo.contenedor.replaceChildren();
+        equipo.asistenciasContenedor.replaceChildren();
+        equipo.opciones = [];
+        equipo.siguienteIndice = 0;
+        equipo.siguienteIndiceAsistencia = 0;
+        const clubId = equipo.club.value;
+        const categoriaId = categoria ? categoria.value : equipo.club.selectedOptions[0]?.dataset.categoria || "";
+        if(!clubId || !categoriaId) return;
+
+        try{
+            const parametros = new URLSearchParams({club_id: clubId, categoria_id: categoriaId});
+            const respuesta = await fetch(`consultar_jugadores_equipo.php?${parametros}`);
+            if(!respuesta.ok) throw new Error("No se pudieron cargar los jugadores del equipo.");
+            const datos = await respuesta.json();
+            if(solicitud !== equipo.solicitud) return;
+            equipo.opciones = datos.jugadores;
+            if(equipo.opciones.length === 0){
+                const aviso = document.createElement("p");
+                aviso.textContent = "No hay jugadores registrados en este club y categoría.";
+                equipo.contenedor.appendChild(aviso);
+                equipo.asistenciasContenedor.appendChild(aviso.cloneNode(true));
+                return;
+            }
+            agregarFilaAporte(equipo, false);
+            agregarFilaAporte(equipo, true);
+        }catch(error){
+            console.error(error);
+            const aviso = document.createElement("p");
+            aviso.textContent = "No se pudieron cargar los jugadores.";
+            equipo.contenedor.appendChild(aviso);
+            equipo.asistenciasContenedor.appendChild(aviso.cloneNode(true));
+        }
+    }
+
+    function actualizarVisibilidad(){
+        const estadoJugado = !estado || estado.value === "jugado";
+        const marcadorValido = resultado.value.match(/^\s*(\d{1,3})\s*-\s*(\d{1,3})\s*$/);
+        seccion.hidden = !estadoJugado || !marcadorValido;
+        return marcadorValido;
+    }
+
+    equipos.forEach(equipo => {
+        equipo.boton.addEventListener("click", () => agregarFilaAporte(equipo, false));
+        equipo.asistenciasBoton.addEventListener("click", () => agregarFilaAporte(equipo, true));
+        equipo.club.addEventListener("change", () => cargarJugadoresEquipo(equipo));
+    });
+    if(categoria){
+        categoria.addEventListener("change", () => equipos.forEach(cargarJugadoresEquipo));
+    }
+    if(estado) estado.addEventListener("change", actualizarVisibilidad);
+    resultado.addEventListener("input", actualizarVisibilidad);
+    equipos.forEach(cargarJugadoresEquipo);
+    actualizarVisibilidad();
+
+    formulario.addEventListener("submit", event => {
+        if(estado && estado.value !== "jugado") return;
+        const marcador = actualizarVisibilidad();
+        if(!marcador) return;
+
+        const cantidadesEsperadas = [Number(marcador[1]), Number(marcador[2])];
+        const cantidadesIngresadas = equipos.map(equipo =>
+            [...equipo.contenedor.querySelectorAll('input[type="number"]')]
+                .reduce((total, input) => total + Number(input.value || 0), 0)
+        );
+        const asistenciasIngresadas = equipos.map(equipo =>
+            [...equipo.asistenciasContenedor.querySelectorAll('input[type="number"]')]
+                .reduce((total, input) => total + Number(input.value || 0), 0)
+        );
+        if(cantidadesEsperadas.some((cantidad, indice) => cantidad !== cantidadesIngresadas[indice])){
+            event.preventDefault();
+            window.alert("Asigna exactamente los goles indicados en el marcador a cada equipo. Las asistencias se cargan por separado y pueden corresponder a otros jugadores.");
+        }else if(asistenciasIngresadas.some((cantidad, indice) => cantidad > cantidadesEsperadas[indice])){
+            event.preventDefault();
+            const equipo = asistenciasIngresadas[0] > cantidadesEsperadas[0] ? "local" : "visitante";
+            window.alert(`Revisa las asistencias del equipo ${equipo}: no pueden superar los goles de ese equipo.`);
+        }
+    });
+}
 
 // Presenta la gestión de sanciones y sus indicadores resumidos.
 function mostrarTarjetas(){
@@ -2023,15 +2368,47 @@ function consultarJugadores(){
 document.getElementById("contenido").innerHTML=`
 
 <h2>Jugadores registrados</h2>
-
-<iframe 
+<div class="buscador-consulta-jugadores">
+    <label for="buscarJugadorConsulta">Buscar jugador por nombre, apellido o cédula:</label>
+    <input type="search" id="buscarJugadorConsulta" placeholder="Escribe nombre, apellido o cédula" autocomplete="off" oninput="filtrarConsultaJugadores()">
+</div>
+<p id="estadoBusquedaConsulta" class="estado-busqueda-jugadores" role="status" aria-live="polite"></p>
+<iframe
+id="iframeConsultaJugadores"
 src="consultar_jugadores.php"
 width="100%"
-height="400">
+height="400"
+title="Listado de jugadores">
 </iframe>
 
 `;
 
+    const iframe = document.getElementById("iframeConsultaJugadores");
+    iframe.addEventListener("load", filtrarConsultaJugadores);
+}
+
+function filtrarConsultaJugadores(){
+    const buscador = document.getElementById("buscarJugadorConsulta");
+    const iframe = document.getElementById("iframeConsultaJugadores");
+    const estado = document.getElementById("estadoBusquedaConsulta");
+    if(!buscador || !iframe || !iframe.contentDocument) return;
+
+    const tabla = iframe.contentDocument.querySelector(".tabla-jugadores-contenedor table");
+    if(!tabla) return;
+
+    const busqueda = normalizarBusquedaJugador(buscador.value);
+    const filas = Array.from(tabla.tBodies).flatMap(cuerpo => Array.from(cuerpo.rows));
+    let cantidadVisible = 0;
+    filas.forEach(fila => {
+        const celdas = Array.from(fila.cells).map(celda => celda.textContent);
+        const texto = `${celdas.join(" ")} ${celdas[2] || ""} ${celdas[1] || ""}`;
+        const coincide = !busqueda || normalizarBusquedaJugador(texto).includes(busqueda);
+        fila.hidden = !coincide;
+        if(coincide) cantidadVisible++;
+    });
+    if(estado){
+        estado.textContent = busqueda && cantidadVisible === 0 ? "No se encontraron jugadores." : "";
+    }
 }
 
 
